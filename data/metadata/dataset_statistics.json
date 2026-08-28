@@ -1,0 +1,54 @@
+{
+  "total_samples": 3458,
+  "total_unique_speakers": 3028,
+  "splits": {
+    "train": {
+      "samples": 2418,
+      "speakers": 2120,
+      "age_labeled": 2042,
+      "gender_labeled": 2199,
+      "age_distribution": {
+        "18-30": 1111,
+        "31-45": 693,
+        "46-60": 136,
+        "60+": 102
+      },
+      "gender_distribution": {
+        "male": 1565,
+        "female": 634
+      }
+    },
+    "validation": {
+      "samples": 520,
+      "speakers": 454,
+      "age_labeled": 421,
+      "gender_labeled": 485,
+      "age_distribution": {
+        "31-45": 154,
+        "46-60": 33,
+        "18-30": 219,
+        "60+": 15
+      },
+      "gender_distribution": {
+        "male": 339,
+        "female": 146
+      }
+    },
+    "test": {
+      "samples": 520,
+      "speakers": 454,
+      "age_labeled": 447,
+      "gender_labeled": 472,
+      "age_distribution": {
+        "18-30": 219,
+        "46-60": 29,
+        "31-45": 181,
+        "60+": 18
+      },
+      "gender_distribution": {
+        "female": 134,
+        "male": 338
+      }
+    }
+  }
+}
