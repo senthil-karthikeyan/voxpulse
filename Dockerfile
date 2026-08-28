@@ -1,6 +1,6 @@
 # ==============================================================================
 # Dockerfile for VoxPulse Voice Attribute Inference Service
-# Production-ready, ephemeral audio handling, uv-powered build
+# Production-ready, baked ECAPA-TDNN weights, uv-powered build
 # ==============================================================================
 
 FROM python:3.12-slim-bookworm
@@ -30,20 +30,23 @@ WORKDIR /app
 # Copy dependency specifications first for optimal layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install project dependencies into virtualenv
+# Install project dependencies into virtualenv (excluding project itself for caching)
 RUN uv sync --frozen --no-install-project
 
-# Copy application source code and scripts
+# Copy application source code, scripts, model weights, and documentation
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+COPY model_weights/ ./model_weights/
 COPY README.md ./
 
-# Sync project wheel
+# Sync project package
 RUN uv sync --frozen
 
-# Create unprivileged user for security
+# Download and bake pretrained SpeechBrain ECAPA-TDNN model into image during build
+RUN uv run python scripts/download_model.py
+
+# Create unprivileged user for security and set file ownership
 RUN useradd -m -u 1000 voxpulse && \
-    mkdir -p /app/model_weights /app/pretrained_models && \
     chown -R voxpulse:voxpulse /app
 
 USER voxpulse
@@ -51,9 +54,9 @@ USER voxpulse
 # Expose FastAPI application port
 EXPOSE 8000
 
-# Health check
+# Health check probe
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Launch uvicorn via uv run
+# Launch uvicorn server via uv run
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

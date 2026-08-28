@@ -204,6 +204,7 @@ voxpulse/
 │   ├── calibrate_temperature.py         # Optimizes Temperature Scaling (T) on validation set
 │   └── evaluate_models.py               # Evaluates models on held-out test split with ECE & MABE
 ├── scripts/                             # Operational & benchmarking CLI utilities
+│   ├── download_model.py                # Automated SpeechBrain ECAPA-TDNN downloader & verifier
 │   ├── benchmark.py                     # Latency & CPU profiling benchmark across audio durations
 │   ├── test_websocket.py                # Multi-mode manual WebSocket testing client
 │   ├── evaluate.py                      # Mozilla Common Voice evaluation runner CLI
@@ -226,52 +227,58 @@ voxpulse/
 
 ---
 
-## 5. Model Choice Rationale
+## 5. Model Architecture & Setup
 
-### Why ECAPA-TDNN was Selected
-
-**ECAPA-TDNN** (*Emphasized Channel Attention, Propagation and Aggregation Time Delay Neural Network*) is a state-of-the-art acoustic representation model developed for speaker recognition on VoxCeleb (`speechbrain/spkrec-ecapa-voxceleb`).
-
-1. **Pretrained Latent Voice Representation**: ECAPA-TDNN compresses continuous speech into a compact **192-dimensional latent vector** capturing fundamental vocal tract dimensions, pitch resonance (F0), formant frequencies (F1–F3), and spectral envelope characteristics.
-2. **Frozen Backbone Efficiency**: The 14.7M parameter encoder backbone remains **completely frozen** during training and inference. Downstream demographic heads require only lightweight MLPs ($\sim 12\text{k} - 35\text{k}$ parameters), making training instantaneous and eliminating catastrophic forgetting across accents.
-3. **Strict CPU Latency Compliance**: ECAPA-TDNN generates 192-d embeddings on CPU in $\sim 388\text{ ms}$ for 5-second audio chunks (under 350MB RAM footprint). In contrast, large self-supervised transformers like Wav2Vec2-Large require $> 2,500\text{ ms}$ on CPU, making them unsuitable for real-time IVR telephony SLAs.
-
-### Architectural Workflow in Simple Terms
-
-It is crucial to understand that **ECAPA-TDNN itself does NOT predict age or gender**:
+The VoxPulse inference engine operates on a **two-tier model hierarchy**:
 
 ```text
-Audio Waveform (16kHz Mono)
-            │
-            ▼
-┌──────────────────────────────────────────────┐
-│  Pretrained ECAPA-TDNN Backbone (Frozen)     │  <-- Extracts latent acoustic traits
-└──────────────────────┬───────────────────────┘
-                       │
-                       ▼ 192-Dimensional Voice Vector
-            ┌──────────┴──────────┐
-            ▼                     ▼
-┌──────────────────────┐ ┌──────────────────────┐
-│ Trained Gender Head  │ │ Trained Age Head     │  <-- Downstream PyTorch MLPs
-│ (192 -> 64 -> 2)     │ │ (192 -> 128 -> 64 -> 3)│
-└──────────┬───────────┘ └──────────┬───────────┘
-           │                        │
-           ▼                        ▼ Temperature Scaling (T = 1.4648)
-     Gender Output              Age Bracket Output
-     (male / female)            (18-30 / 31-45 / 46-60 / 60+)
+                               Audio Input
+                                    │
+                                    ▼
+                          Audio Processing & VAD
+                                    │
+                                    ▼
+                    SpeechBrain ECAPA-TDNN (Frozen)
+                    speechbrain/spkrec-ecapa-voxceleb
+                                    │
+                                    ▼
+                          192-D Voice Embedding
+                             ┌──────┴──────┐
+                             │             │
+                             ▼             ▼
+                     Gender Classifier   Ordinal Age Classifier
+                      gender_head.pt        age_head.pt
+                             │             │
+                             ▼             ▼
+                          Gender      Age Bracket
 ```
 
-### What the `.pt` Weight Files Represent
+### 1. Pretrained Third-Party Voice Encoder (SpeechBrain ECAPA-TDNN)
+* **Model ID**: `speechbrain/spkrec-ecapa-voxceleb`
+* **Role**: **Frozen Acoustic Feature Extractor** converting 16kHz audio waveforms into 192-dimensional latent voice vectors.
+* **Why Frozen**: ECAPA-TDNN's 14.7M parameters were pretrained on thousands of speakers in VoxCeleb. Freezing the backbone preserves cross-accent generalization, eliminates catastrophic forgetting, and reduces memory consumption to ~350MB RAM.
+* **Automated Setup**: Downloaded and verified automatically via:
+  ```bash
+  uv run python scripts/download_model.py
+  ```
+  The script stores the model artifacts in `pretrained_models/spkrec-ecapa-voxceleb/` (`hyperparams.yaml`, `embedding_model.ckpt`, `classifier.ckpt`, `mean_var_norm_emb.ckpt`, `label_encoder.ckpt`).
 
-* **The Python Code (`app/models/age_classifier.py`)**: Defines the mathematical graph (layers, dimensions, ReLU activations).
-* **The Weight File (`model_weights/age_head.pt`)**: Contains the serialized `state_dict` (learned floating-point connection matrices and biases discovered during supervised gradient descent).
-* **Production Inference**: During FastAPI startup, the pre-trained weights from `model_weights/*.pt` are loaded into memory **once**. Incoming requests execute instant forward matrix multiplications ($< 0.3\text{ ms}$) without disk I/O or retraining.
+### 2. Task-Specific Trained Classifier Heads (Project Artifacts)
+* **Gender Head (`model_weights/gender_head.pt`)**: Lightweight 2-layer MLP ($192 \to 64 \to 2$, 12,482 parameters) trained specifically for binary gender prediction with class-weighted cross-entropy.
+* **Age Head (`model_weights/age_head.pt`)**: PyTorch `OrdinalAgeHead` ($192 \to 128 \to 64 \to 3$, 33,219 parameters) predicting 3 cumulative thresholds with temperature calibration ($T = 1.4648$).
+* **Model Lifecycle**: Classifier weights and calibration files are loaded **once during application startup** and stored in memory. The API never retrains models or downloads weights during request processing.
 
 ---
 
-## 6. Alternative Models and Trade-offs
+## 6. Model Choice Rationale & Trade-offs
 
-During architectural exploration, three alternative model paradigms were evaluated against the production requirement of **sub-500ms CPU inference with robust accuracy**:
+### Why ECAPA-TDNN was Selected
+
+1. **Pretrained Latent Voice Representation**: Compresses continuous speech into a compact **192-dimensional vector** capturing vocal tract dimensions, pitch resonance (F0), formant frequencies (F1–F3), and spectral envelope characteristics.
+2. **Frozen Backbone Efficiency**: Downstream demographic heads require only lightweight MLPs ($\sim 12\text{k} - 35\text{k}$ parameters), making training fast and stable.
+3. **Strict CPU Latency Compliance**: ECAPA-TDNN generates 192-d embeddings on CPU in $\sim 388\text{ ms}$ for 5-second audio chunks. In contrast, large self-supervised transformers like Wav2Vec2-Large require $> 2,500\text{ ms}$ on CPU, making them unsuitable for real-time IVR telephony SLAs.
+
+### Alternative Models and Trade-offs
 
 | Architecture | Exact Age Accuracy | Adjacent Age Accuracy ($\pm 1$) | Catastrophic Errors ($18\text{-}30 \leftrightarrow 60+$) | Warm 5.0s CPU Latency (P95) | Model Footprint | RAM Usage | CPU SLA Suitability | Final Production Decision |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
@@ -279,12 +286,6 @@ During architectural exploration, three alternative model paradigms were evaluat
 | **Experiment B: openSMILE eGeMAPS + Classical ML** | 76.06% | 92.17% | 3.80% | ~155 ms | 8 MB | ~95 MB | Excellent | Rejected (Inferior predictive accuracy) |
 | **Experiment C: Wav2Vec2-Large-Robust** | ~86.0% | ~96.0% | ~1.5% | 2,548.16 ms | 339.4 MB | ~1.5 GB | Unsuitable | Rejected (Severe $>500\text{ms}$ SLA violation) |
 | **Experiment D: End-to-End Fine-Tuning** | ~87.5% *(Est.)* | ~96.5% *(Est.)* | ~1.2% *(Est.)* | ~1,200 ms *(Est.)* | ~350 MB | ~1.8 GB | Unsuitable | Rejected (Excessive computational cost & latency) |
-
-### Why the Final Architecture Won
-
-1. **vs. openSMILE eGeMAPS**: Handcrafted acoustic features (pitch, jitter, shimmer) run fast (~155ms) but cannot capture complex vocal fold aging dynamics, resulting in lower exact accuracy ($76.06\%$) and higher boundary errors.
-2. **vs. Wav2Vec2-Large**: While Wav2Vec2 offers strong acoustic representations, its 24 transformer layers and 317M parameters require **2.55 seconds per 5s chunk on CPU**, violating the real-time telephony constraint by $500\%$.
-3. **The Sweet Spot**: Frozen ECAPA-TDNN paired with our PyTorch Ordinal Head delivers state-of-the-art feature quality while comfortably satisfying the $< 500\text{ ms}$ SLA at **444.35 ms P95**.
 
 ---
 
@@ -386,11 +387,11 @@ uv run python training/evaluate_models.py
 ### Prerequisites
 
 * **Python**: `3.11` or `3.12` (recommended: Python 3.12)
-* **Package Manager**: [uv](https://github.com/astral-sh/uv) (fast Python package manager)
+* **Package Manager**: [uv](https://github.com/astral-sh/uv) (ultra-fast Python package manager)
 * **System Utilities**: `ffmpeg` (for multi-format audio decoding)
 * **Docker & Docker Compose** (optional, for containerized deployment)
 
-### 1. Local Development with uv
+### 1. Local Development Setup
 
 ```bash
 # 1. Clone the repository and navigate into it
@@ -400,20 +401,35 @@ cd voxpulse
 # 2. Sync dependencies using uv
 uv sync
 
-# 3. Start the FastAPI development server
+# 3. Download and verify the pretrained SpeechBrain ECAPA-TDNN model
+uv run python scripts/download_model.py
+
+# 4. Start the FastAPI development server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The API documentation is available interactively at:
+The interactive documentation will be available at:
 * Swagger UI: `http://localhost:8000/docs`
 * ReDoc: `http://localhost:8000/redoc`
 
-### 2. Running with Docker Compose
+### 2. Docker Build & Deployment
 
 ```bash
-# Build and launch containerized service
+# 1. Build Docker image (downloads & bakes the ECAPA model during build)
+docker build -t voxpulse-service .
+
+# 2. Run container (loads pre-baked models from disk with zero runtime downloads)
+docker run -p 8000:8000 voxpulse-service
+```
+
+Or run with Docker Compose:
+
+```bash
 docker compose up --build
 ```
+
+> [!NOTE]
+> **Docker Model Baking**: During `docker build`, `scripts/download_model.py` executes inside the build container to download and store the SpeechBrain ECAPA-TDNN model inside `/app/pretrained_models/spkrec-ecapa-voxceleb/`. When the container runs, it loads the model directly from local disk and performs zero network downloads during container startup or API requests.
 
 ---
 
