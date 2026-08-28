@@ -1,0 +1,136 @@
+{
+  "model_name": "AgeClassifierHead",
+  "temperature": 1.5422,
+  "validation_samples": 421,
+  "calibration_timestamp": "2026-08-28T11:02:13.848343+00:00",
+  "ece_before": 0.1069,
+  "ece_after": 0.0846,
+  "brier_before": 0.2807,
+  "brier_after": 0.2636,
+  "uncalibrated_avg_confidence": 0.9332,
+  "calibrated_avg_confidence": 0.9061,
+  "bins_before": [
+    {
+      "bin": "0.00-0.10",
+      "samples": 0,
+      "avg_confidence": 0.05,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.10-0.20",
+      "samples": 0,
+      "avg_confidence": 0.15,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.20-0.30",
+      "samples": 0,
+      "avg_confidence": 0.25,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.30-0.40",
+      "samples": 0,
+      "avg_confidence": 0.35,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.40-0.50",
+      "samples": 3,
+      "avg_confidence": 0.4802,
+      "accuracy": 0.6667
+    },
+    {
+      "bin": "0.50-0.60",
+      "samples": 24,
+      "avg_confidence": 0.5445,
+      "accuracy": 0.4167
+    },
+    {
+      "bin": "0.60-0.70",
+      "samples": 13,
+      "avg_confidence": 0.6456,
+      "accuracy": 0.3846
+    },
+    {
+      "bin": "0.70-0.80",
+      "samples": 21,
+      "avg_confidence": 0.7514,
+      "accuracy": 0.619
+    },
+    {
+      "bin": "0.80-0.90",
+      "samples": 23,
+      "avg_confidence": 0.8499,
+      "accuracy": 0.4783
+    },
+    {
+      "bin": "0.90-1.00",
+      "samples": 337,
+      "avg_confidence": 0.993,
+      "accuracy": 0.9139
+    }
+  ],
+  "bins_after": [
+    {
+      "bin": "0.00-0.10",
+      "samples": 0,
+      "avg_confidence": 0.05,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.10-0.20",
+      "samples": 0,
+      "avg_confidence": 0.15,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.20-0.30",
+      "samples": 0,
+      "avg_confidence": 0.25,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.30-0.40",
+      "samples": 1,
+      "avg_confidence": 0.3583,
+      "accuracy": 0.0
+    },
+    {
+      "bin": "0.40-0.50",
+      "samples": 7,
+      "avg_confidence": 0.4885,
+      "accuracy": 0.7143
+    },
+    {
+      "bin": "0.50-0.60",
+      "samples": 28,
+      "avg_confidence": 0.5449,
+      "accuracy": 0.3214
+    },
+    {
+      "bin": "0.60-0.70",
+      "samples": 24,
+      "avg_confidence": 0.6461,
+      "accuracy": 0.5833
+    },
+    {
+      "bin": "0.70-0.80",
+      "samples": 26,
+      "avg_confidence": 0.7492,
+      "accuracy": 0.5
+    },
+    {
+      "bin": "0.80-0.90",
+      "samples": 22,
+      "avg_confidence": 0.8512,
+      "accuracy": 0.7727
+    },
+    {
+      "bin": "0.90-1.00",
+      "samples": 313,
+      "avg_confidence": 0.9863,
+      "accuracy": 0.9297
+    }
+  ]
+}

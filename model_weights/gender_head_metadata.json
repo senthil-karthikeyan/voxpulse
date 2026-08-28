@@ -1,0 +1,30 @@
+{
+  "model_name": "GenderClassifierHead",
+  "embedding_model": "speechbrain/spkrec-ecapa-voxceleb",
+  "embedding_dim": 192,
+  "hidden_dim": 64,
+  "classes": [
+    "male",
+    "female"
+  ],
+  "class_mapping": {
+    "0": "male",
+    "1": "female"
+  },
+  "dataset": "Mozilla Common Voice + FLEURS (Genuine Labels)",
+  "training_timestamp": "2026-08-28T11:02:07.405290+00:00",
+  "train_samples": 2199,
+  "train_speakers": 1903,
+  "val_samples": 485,
+  "val_speakers": 419,
+  "best_epoch": 4,
+  "best_val_accuracy": 0.9361,
+  "best_val_loss": 0.3467,
+  "hyperparameters": {
+    "epochs": 100,
+    "batch_size": 16,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "optimizer": "AdamW"
+  }
+}
