@@ -1,0 +1,23 @@
+services:
+  voxpulse-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voxpulse-voice-attribute-service
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - DEVICE=cpu
+      - GENDER_CONFIDENCE_THRESHOLD=0.60
+      - AGE_CONFIDENCE_THRESHOLD=0.40
+      - ENABLE_SPEECHBRAIN_DOWNLOAD=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
