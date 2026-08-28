@@ -85,7 +85,7 @@ data/raw/
 # Third-Party Pretrained Model Weights (SpeechBrain / VoxCeleb / HuggingFace)
 pretrained_models/
 speechbrain/
-models/
+/models/
 
 # Ephemeral & Temp Dirs
 tmp/
